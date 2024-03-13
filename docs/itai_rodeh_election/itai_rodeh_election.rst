@@ -1,7 +1,7 @@
 .. include:: substitutions.rst
 
 ================================
-|DistAlgName|
+|itai_rodeh_election|
 ================================
 
 
