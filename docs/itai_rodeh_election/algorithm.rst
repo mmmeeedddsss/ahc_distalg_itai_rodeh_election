@@ -8,24 +8,72 @@
 Background and Related Work
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Present any background information survey the related work. Provide citations.
+Famously, Angluin et al.  shown that no algorithm can result in a leader in an arbitrary sized ring
+of anonymous processes within a finitely bounded time [Angluin1980]_.
+The result is interpreted as the symmetry in such a system can be broken either by unbounded computational time or
+breaking the correctness of the algorithm. Following the result, some probabilistic algorithms have been proposed such as the
+the paper we discuss and implement in here, the Itai-Rodeh election algorithm [Itai1981]_, an improved version of the original Itai-Rodeh election algorithm
+with the additional assumption of FIFO communication channels [Fokkink2005]_, and [Abrahamson1986]_. TODO add more related work.
+
+.. [Angluin1980] ANGLUIN, D. (1980), Local and global properties in networks of processes, in “12th Annual ACM Sympos. on Theory of Computing, Los Angeles, California,” pp. 82-93.
+.. [Abrahamson1986] Abrahamson, K., Adler, A., Higham, L., & Kirkpatrick, D. (1986). Probabilistic solitude verification on a ring. Proceedings of the Fifth Annual ACM Symposium on Principles of Distributed Computing, 161–173. Presented at the Calgary, Alberta, Canada. doi:10.1145/10590.10604
+
 
 Distributed Algorithm: |itai_rodeh_election|
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An example distributed algorithm for broadcasting on an undirected graph is presented in  :ref:`Algorithm <BlindFloodingAlgorithmLabel>`.
+Itai-Rodeh Leader Election Algorithm is presented in :ref:`Algorithm <ItaiRodehLabel>`.
 
-.. _BlindFloodingAlgorithmLabel:
+Itai-Rodeh Leader Election Algorithm requires each process to maintain the following parameters:
+
+* :math:`id_i \in {1,...,k}`, for some :math:`k \geq 2`, is its identity
+* :math:`state_i \in` {active, passive, leader} is its current state
+* :math:`round_i \in N` represents the number of the current election round.
+
+At the start of each election round, each process is active and sends their identities randomly as :math:`id_i \in {1,...,k}`, for some :math:`k \geq 2`.
+After that, each process sends the following message to its communication channel:
+(id,round,hop,bit) where
+
+* id is the process's identity
+* round is the current round number
+* hop is the number of hops the message has traveled
+* bit is flag that is set to 1 initially, but is set to 0 when the process receives a message
+with a same id that it has to prevent two processes to elected as the leader at the same time.
+
+.. _ItaiRodehPseudocodeLabel:
+
+Upon receiving a message, the process acts as follows:
+
+* If it is passive, it passes the message by only increasing the hop count by one.
+
+* If it is active, it checks:
+
+   * If the hop count == N, and bit == 1, it becomes leader.
+
+   * If the hop count == N, and bit == 0, process infers that at least one other process picked the same biggest number for their id,
+   so no leader could have been elected in this round. It starts a new round
+
+   * If round and id is the same as the received message while hop < N, it emits the message (id, round, hop+1, 0) to the channel.
+
+   * If round in the message is bigger than the process knows, process becomes passive and passes the message by increasing the hop count.
+
+   * If the round in the message is equal to the state of the process, but the id of the process is smaller than the id in the message, process becomes passive and passes the message by increasing the hop count.
+
+   * In all other cases, the process purges the message it received.
+
+
+.. _ItaiRodehLabel:
 
 .. code-block:: RST
     :linenos:
-    :caption: Blind flooding algorithm.
-    
+    :caption: Itai-Rodeh Leader Election Algorithm [Itai1981]_.
 
-    Implements: BlindFlooding Instance: cf
-    Uses: LinkLayerBroadcast Instance: lbc
-    Events: Init, MessageFromTop, MessageFromBottom
-    Needs:
+    TODO Edit following with the implementation
+
+    Implements: Itai-Rodeh Leader Election Algorithm : cf
+    Uses: ?LinkLayerBroadcast Instance: lbc
+    Events: ?Init, MessageFromTop, MessageFromBottom
+    Needs: ?
 
     OnInit: () do
     
@@ -36,7 +84,6 @@ An example distributed algorithm for broadcasting on an undirected graph is pres
         Trigger lbc.Broadcast ( m )
 
 
-Do not forget to explain the algorithm line by line in the text.
 
 Example
 ~~~~~~~~
@@ -46,7 +93,43 @@ Provide an example for the distributed algorithm.
 Correctness
 ~~~~~~~~~~~
 
-Present Correctness, safety, liveness and fairness proofs.
+Let's study algorithm in terms of its Correctness, safety, liveness and fairness properties.
+
+**Correctness** is the property of the algorithm that ensures that the algorithm always produces the correct result.
+As it has been discussed, Itai-Rodeh Leader Election Algorithm is a Las Vegas algorithm that terminates with probability 1,
+and always produces correct result.
+
+For the algorithm to be incorrect, a termination configuration either ends with no leader, or multiple leaders.
+
+* For the **case of no leader**, following the pseudocode shared in the :ref:`Pseudo-code <ItaiRodehPseudocodeLabel>`,
+  each process needs to become passive. To become passive, a process needs to receive either a message from a bigger round, or a message with a bigger id.
+  Since the message containing the bigger id is sent from another process, this process cannot become passive, so there should at least a process that does not
+  become passive.
+
+* For the **case of multiple leaders**, two or more processes should get the same biggest id in a round, but in this case
+  since the hop counter will be less than the size of the ring, the uniqueness bit we use will be emitted as false and
+  no process will be elected as the leader.
+
+**Safety** is the property of the algorithm that ensures that the algorithm never produces an incorrect result.
+In the case of Itai-Rodeh Leader Election Algorithm, the algorithm itself does not describe any information
+about the formation of the ring and its recovery in case of a node failure. Assuming that there can be no
+partitioning in the ring, the safety of the algorithm depends on handling of the link and process failures.
+
+For process/link failures:
+   * If a process/link becomes unavailable, algorithm cannot proceed thus cannot produce any result.
+   * If the process/link produces incorrect results(e.g it does not alter hop counter,
+     or does not flip the uniqueness bit) the result produced by the algorithm would become incorrect.
+     (TODO Author here does not sure if byzantine fault tolerance is required for the algorithm to be safe, or if it is enough to handle the process failures.)
+
+Following the failure scenarios, we can conclude that the algorithm is safe, as it does not produce incorrect results.
+
+**Liveness** is the property of the algorithm that ensures that the algorithm always terminates with expected results.
+
+As it has been discussed in the safety section, the Itai-Rodeh Leader Election Algorithm does not produce any results
+when a failure happens on a process or a link. This characteristic makes the algorithm not always live.
+
+**Fairness** is the property of the algorithm that ensures that the algorithm treats all processes fairly. In our case,
+each of the processes randomly picks an id for them in each round from the same set of ids, so the algorithm is fair.
 
 
 Complexity 
